@@ -6,7 +6,7 @@ RUN apk update
 RUN apk --no-cache --update --virtual build-dependencies add gcc g++ libgcc linux-headers autoconf automake make git patch perl-dev python3-dev expat-dev curl wget
 RUN apk add perl
 
-RUN git clone https://github.com/backuppc/backuppc-xs.git --branch ${BACKUPPC_XS_VERSION} /root/backuppc-xs 
+RUN git clone https://github.com/backuppc/backuppc-xs.git --branch ${BACKUPPC_XS_VERSION} /root/backuppc-xs
 RUN cd /root/backuppc-xs \
     && perl Makefile.PL && make && make test && make install
 
@@ -35,11 +35,12 @@ RUN cd / \
     && cd /BackupPC-4.2.1 \
     && perl configure.pl \
        --batch \
-       --cgi-dir /var/www/cgi-bin/BackupPC \
+       --backuppc-user=root \
+       --cgi-dir /usr/share/backuppc/cgi-bin/ \
        --data-dir /data/BackupPC \
        --hostname myHost \
-       --html-dir /var/www/html/BackupPC \
-       --html-dir-url /BackupPC \
+       --html-dir /usr/share/backuppc/html \
+       --html-dir-url /backuppc \
        --install-dir /usr/local/BackupPC
 
 
@@ -59,9 +60,9 @@ RUN cd / \
 #RUN ls -al /usr/lib/python3.6/site-packages
 RUN apk add supervisor
 RUN ls -al /
-
-
-
+RUN apk add nginx fcgiwrap
+RUN rm -f /etc/nginx/conf.d/default.conf
+RUN mkdir -p /run/nginx
 RUN apk del build-dependencies
 
 COPY files /
