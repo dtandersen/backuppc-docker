@@ -41,7 +41,8 @@ RUN cd / \
        --hostname myHost \
        --html-dir /usr/share/backuppc/html \
        --html-dir-url /backuppc \
-       --install-dir /usr/local/BackupPC
+       --install-dir /usr/local/BackupPC \
+       --log-dir /var/log/backuppc
 
 
 #RUN perl -MCPAN -e 'install Archive::Zip'
