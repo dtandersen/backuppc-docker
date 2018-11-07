@@ -1,0 +1,10 @@
+version: '3'
+services:
+  backuppc:
+    build: .
+    ports:
+    - "80:80"
+    volumes:
+    - /id_rsa:/home/backuppc/.ssh/id_rsa
+    - ./etc:/etc/backuppc
+    - ./data:/var/lib/data
