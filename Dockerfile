@@ -1,71 +1,56 @@
-FROM alpine:3.8
+FROM alpine:3.8 AS stage0
 
-ARG BACKUPPC_XS_VERSION=0.57
+MAINTAINER https://github.com/dtandersen/backuppc-docker
 
-RUN apk update
-RUN apk --no-cache --update --virtual build-dependencies add gcc g++ libgcc linux-headers autoconf automake make git patch perl-dev python3-dev expat-dev curl wget
-RUN apk add perl
+ENV BACKUPPC_XS_VERSION=0.57 \
+    DATA=/var/lib/data \
+    BPC_USER=backuppc
 
-RUN git clone https://github.com/backuppc/backuppc-xs.git --branch ${BACKUPPC_XS_VERSION} /root/backuppc-xs
-RUN cd /root/backuppc-xs \
-    && perl Makefile.PL && make && make test && make install
+RUN apk --no-cache --virtual build-dependencies add gcc g++ libgcc linux-headers autoconf automake make git patch perl-dev python3-dev expat-dev curl wget perl-app-cpanminus
+RUN apk --update --no-cache add perl supervisor nginx fcgiwrap bash su-exec && \
+    cpanm install --notest Archive::Zip && \
+    cpanm install --notest XML::RSS && \
+    cpanm install --notest CGI && \
+    cpanm install --notest File::Listing && \
+    cpanm install --notest Net::FTP && \
+    cpanm install --notest Net::FTP::RetrHandle && \
+    cpanm install --notest Net::FTP::AutoReconnect && \
+    adduser backuppc -S -g "" -G www-data && \
+    rm -f /etc/nginx/conf.d/default.conf && \
+    mkdir -p /run/nginx
 
-#RUN cd BackupPC-XS-0.50 \
-#    && perl Makefile.PL \
-#    && make \
-#    && make test \
-#    && make install
-#RUN perlbrew install-cpanm
-#RUN cpanm install IPC::Run
-ENV PERL_MM_USE_DEFAULT=1
-RUN apk add bash
-RUN curl -L https://install.perlbrew.pl | bash
-RUN ~/perl5/perlbrew/bin/perlbrew install-cpanm
-RUN /root/perl5/perlbrew/bin/cpanm install Archive::Zip
-RUN /root/perl5/perlbrew/bin/cpanm install XML::RSS
-RUN /root/perl5/perlbrew/bin/cpanm install CGI
-RUN /root/perl5/perlbrew/bin/cpanm install File::Listing
-RUN /root/perl5/perlbrew/bin/cpanm install Net::FTP
-RUN /root/perl5/perlbrew/bin/cpanm install --no-interactive --verbose  --notest Net::FTP::RetrHandle
-RUN /root/perl5/perlbrew/bin/cpanm install Net::FTP::AutoReconnect
+FROM stage0 AS stage2
+RUN git clone --quiet -c advice.detachedHead=false https://github.com/backuppc/backuppc-xs.git --branch ${BACKUPPC_XS_VERSION} /tmp/backuppc-xs
+RUN cd /tmp/backuppc-xs&& \
+    perl Makefile.PL && \
+    make && \
+    make test && \
+    make install
 
-RUN cd / \
-    && wget -q https://github.com/backuppc/backuppc/releases/download/4.2.1/BackupPC-4.2.1.tar.gz \
-    && tar zxvf BackupPC-4.2.1.tar.gz \
-    && cd /BackupPC-4.2.1 \
-    && perl configure.pl \
+FROM stage2 AS stage4
+RUN curl -SL https://github.com/backuppc/backuppc/releases/download/4.2.1/BackupPC-4.2.1.tar.gz | tar zx -C /tmp && \
+    cd /tmp/BackupPC-4.2.1 && \
+    perl configure.pl \
        --batch \
-       --backuppc-user=root \
+       --backuppc-user=${BPC_USER} \
        --cgi-dir /usr/share/backuppc/cgi-bin/ \
-       --data-dir /data/BackupPC \
+       --data-dir ${DATA} \
        --hostname myHost \
        --html-dir /usr/share/backuppc/html \
        --html-dir-url /backuppc \
-       --install-dir /usr/local/BackupPC \
+       --install-dir /usr/local/backuppc \
        --log-dir /var/log/backuppc
 
-
-#RUN perl -MCPAN -e 'install Archive::Zip'
-#RUN perl -MCPAN -e 'install XML::RSS'
-#RUN perl -MCPAN -e 'install CGI'
-#RUN perl -MCPAN -e 'install File::Listing, Net::FTP, Net::FTP::RetrHandle, Net::FTP::AutoReconnect'
-#RUN pip3 install --upgrade pip
-#RUN echo x
-#RUN pip3 install git+https://github.com/Supervisor/supervisor.git#egg=supervisor
-#RUN apk add which
-#RUN pip3 show -f supervisor
-#RUN ls -al /bin | grep sup
-#RUN which supervisord
-#RUN which supervisor
-#RUN /bin/supervisord
-#RUN ls -al /usr/lib/python3.6/site-packages
-RUN apk add supervisor
-RUN ls -al /
-RUN apk add nginx fcgiwrap
-RUN rm -f /etc/nginx/conf.d/default.conf
-RUN mkdir -p /run/nginx
 RUN apk del build-dependencies
+RUN rm -rf /tmp/*
+RUN rm -rf /root/.cpanm
 
+FROM stage4
 COPY files /
-RUN ls -al /etc | grep sup
-CMD supervisord -c /etc/supervisord.conf -n
+#COPY --from=stage4 /usr/share/backuppc /usr/share/backuppc
+#COPY --from=stage4 /usr/local/backuppc /usr/local/backupp
+#COPY --from=stage2 /usr/local/lib/perl5/site_perl/auto/BackupPC/XS/XS.so /usr/local/lib/perl5/site_perl/auto/BackupPC/XS/XS.so
+#COPY --from=stage2 /usr/local/lib/perl5/site_perl/BackupPC/XS.pm /usr/local/lib/perl5/site_perl/BackupPC/XS.pm
+#COPY --from=stage2 /usr/local/share/man/man3/BackupPC::XS.3pm /usr/local/share/man/man3/BackupPC::XS.3pm
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]
