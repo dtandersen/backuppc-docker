@@ -6,5 +6,5 @@ services:
     - "80:80"
     volumes:
     - /id_rsa:/home/backuppc/.ssh/id_rsa
-    - ./etc:/etc/backuppc
-    - ./data:/var/lib/data
+    - /etc/backuppc:/etc/backuppc
+    - /var/lib/backuppc:/var/lib/data
