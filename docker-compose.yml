@@ -8,3 +8,4 @@ services:
     - /id_rsa:/home/backuppc/.ssh/id_rsa
     - /etc/backuppc:/etc/backuppc
     - /var/lib/backuppc:/var/lib/data
+    restart: always
